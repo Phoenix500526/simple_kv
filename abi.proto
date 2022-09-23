@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package abi;
+
+// 来自客户端的命令请求
+message CommandRequest {
+    oneof request_data {
+        Hget hget = 1;
+        Hmget hmget = 2;
+        Hgetall hgetall = 3;
+        Hset hset = 4;
+        Hmset hmset = 5;
+        Hdel hdel = 6;
+        Hmdel hmdel = 7;
+        Hexist hexist = 8;
+        Hmexist hmexist = 9;
+    }
+}
+
+
+// 服务端的命令响应
+message CommandResponse {
+    // 状态码
+    uint32 status = 1;
+    // 如果状态非 2XX，则需要在 message 中放入具体的错误信息
+    string message = 2;
+    // 成功返回 values
+    repeated Value values = 3;
+    // 成功返回 Kv pairs，针对 getall 等命令
+    repeated Kvpair kvpairs = 4;
+}
+
+// get 相关命令
+message Hget {
+    string table = 1;
+    string key = 2;
+}
+
+message Hmget {
+    string table = 1;
+    repeated string keys = 2;
+}
+
+message Hgetall {
+    string table = 1;
+}
+
+// set 相关命令
+message Hset {
+    string table = 1;
+    Kvpair pair = 2;
+}
+
+message Hmset {
+    string table = 1;
+    repeated Kvpair pairs = 2;
+}
+
+// del 相关命令
+message Hdel {
+    string table = 1;
+    string key = 2;
+}
+
+message Hmdel {
+    string table = 1;
+    repeated string keys = 2;
+}
+
+// 存在性判断
+message Hexist {
+    string table = 1;
+    string key = 2;
+}
+
+message Hmexist {
+    string table = 1;
+    repeated string keys = 2;
+}
+
+// 返回键值
+message Value {
+    oneof value {
+        string string = 1;
+        bytes binary = 2;
+        int64 integer = 3;
+        double float = 4;
+        bool bool = 5;
+    }
+}
+
+// 返回键值对
+message Kvpair {
+    string key = 1;
+    Value value = 2;
+}

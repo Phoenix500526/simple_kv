@@ -6,7 +6,7 @@ use bytes::Bytes;
 impl CommandRequest {
     pub fn new_hget(table: impl Into<String>, key: impl Into<String>) -> Self {
         Self {
-            request_data: Some(RequestData::Hget( Hget {
+            request_data: Some(RequestData::Hget(Hget {
                 table: table.into(),
                 key: key.into(),
             })),
@@ -15,7 +15,7 @@ impl CommandRequest {
 
     pub fn new_hmget(table: impl Into<String>, keys: Vec<String>) -> Self {
         Self {
-            request_data: Some(RequestData::Hmget( Hmget {
+            request_data: Some(RequestData::Hmget(Hmget {
                 table: table.into(),
                 keys,
             })),
@@ -24,7 +24,7 @@ impl CommandRequest {
 
     pub fn new_hgetall(table: impl Into<String>) -> Self {
         Self {
-            request_data: Some(RequestData::Hgetall( Hgetall {
+            request_data: Some(RequestData::Hgetall(Hgetall {
                 table: table.into(),
             })),
         }
@@ -32,16 +32,16 @@ impl CommandRequest {
 
     pub fn new_hset(table: impl Into<String>, key: impl Into<String>, value: Value) -> Self {
         Self {
-            request_data: Some(RequestData::Hset( Hset {
+            request_data: Some(RequestData::Hset(Hset {
                 table: table.into(),
                 pair: Some(Kvpair::new(key, value)),
-            } )),
+            })),
         }
     }
 
     pub fn new_hmset(table: impl Into<String>, pairs: Vec<Kvpair>) -> Self {
         Self {
-            request_data: Some(RequestData::Hmset( Hmset {
+            request_data: Some(RequestData::Hmset(Hmset {
                 table: table.into(),
                 pairs,
             })),
@@ -59,16 +59,16 @@ impl CommandRequest {
 
     pub fn new_hmdel(table: impl Into<String>, keys: Vec<String>) -> Self {
         Self {
-            request_data: Some(RequestData::Hmdel( Hmdel {
+            request_data: Some(RequestData::Hmdel(Hmdel {
                 table: table.into(),
                 keys,
             })),
         }
     }
 
-    pub fn new_hexist(table: impl Into<String>, key: impl Into<String>)-> Self {
+    pub fn new_hexist(table: impl Into<String>, key: impl Into<String>) -> Self {
         Self {
-            request_data: Some(RequestData::Hexist( Hexist {
+            request_data: Some(RequestData::Hexist(Hexist {
                 table: table.into(),
                 key: key.into(),
             })),
@@ -128,18 +128,17 @@ impl From<i64> for Value {
     fn from(i: i64) -> Self {
         Self {
             value: Some(value::Value::Integer(i)),
-         }
+        }
     }
 }
 
 /// 从 f64 转换成 Value
-impl  From<f64> for Value {
+impl From<f64> for Value {
     fn from(f: f64) -> Self {
         Self {
             value: Some(value::Value::Float(f)),
         }
     }
-
 }
 
 /// 从 bool 转换成 Value

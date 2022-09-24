@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_prost::AsyncProstStream;
 use futures::prelude::*;
-use simple_kv::{CommandResponse, CommandRequest};
+use simple_kv::{CommandRequest, CommandResponse};
 use tokio::net::TcpStream;
 use tracing::info;
 
@@ -14,7 +14,8 @@ async fn main() -> Result<()> {
     let stream = TcpStream::connect(addr).await?;
 
     // 使用 AsyncProstStream 处理 TCP Frame
-    let mut client = AsyncProstStream::<_, CommandResponse, CommandRequest, _>::from(stream).for_async();
+    let mut client =
+        AsyncProstStream::<_, CommandResponse, CommandRequest, _>::from(stream).for_async();
 
     // 生成相应的命令并发送
     let cmd = CommandRequest::new_hset("table1", "k1", "v1".into());

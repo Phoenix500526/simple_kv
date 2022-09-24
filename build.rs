@@ -5,6 +5,7 @@ fn main() {
     // . 表示通配符，即为所有的 bytes 都成成 bytes::Bytes。这样效率更高，解析的时候就需要使用 bytes 了
     config.bytes(&["."]);
     // 为 protobuf 生成的协议添加偏序 Trait
+    config.type_attribute(".", "#[derive(PartialOrd)]");
     for item in [
         "Hgetall", "Hget", "Hmget", "Hdel", "Hmdel", "Hexist", "Hmexist",
     ] {

@@ -18,4 +18,4 @@ futures = "0.3" # 提供 Stream Trait
 async-prost = "0.2.1"
 
 [build-dependencies]
-prost-build = "0.8" # 编译 protobuf
+prost-build = "0.9" # 编译 protobuf

@@ -1,3 +1,4 @@
+use std::process::Command;
 fn main() {
     let mut config = prost_build::Config::new();
     // 为 protobuf 的 bytes 类型生成 Bytes 而非缺省的 Vec<u8>。
@@ -9,4 +10,9 @@ fn main() {
         .out_dir("src/pb")
         .compile_protos(&["abi.proto"], &["."])
         .unwrap();
+
+    Command::new("cargo")
+        .args(&["fmt", "--", "src/*.rs"])
+        .status()
+        .expect("cargo fmt failed");
 }

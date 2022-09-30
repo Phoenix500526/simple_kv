@@ -2,6 +2,9 @@ pub mod abi;
 
 use abi::{command_request::RequestData, *};
 use bytes::Bytes;
+use http::StatusCode;
+
+use crate::KvError;
 
 impl CommandRequest {
     pub fn new_hget(table: impl Into<String>, key: impl Into<String>) -> Self {
@@ -146,6 +149,54 @@ impl From<bool> for Value {
     fn from(b: bool) -> Self {
         Self {
             value: Some(value::Value::Bool(b)),
+        }
+    }
+}
+
+impl From<Value> for CommandResponse {
+    fn from(value: Value) -> Self {
+        Self {
+            status: StatusCode::OK.as_u16() as _,
+            values: vec![value],
+            ..Default::default()
+        }
+    }
+}
+
+impl From<KvError> for CommandResponse {
+    fn from(error: KvError) -> Self {
+        let mut result = Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+            message: error.to_string(),
+            values: vec![],
+            kvpairs: vec![],
+        };
+
+        match error {
+            KvError::NotFound(_, _) => result.status = StatusCode::NOT_FOUND.as_u16() as _,
+            KvError::InvalidCommand(_) => result.status = StatusCode::BAD_REQUEST.as_u16() as _,
+            _ => {}
+        }
+        result
+    }
+}
+
+impl From<Vec<Value>> for CommandResponse {
+    fn from(values: Vec<Value>) -> Self {
+        Self {
+            status: StatusCode::OK.as_u16() as _,
+            values,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<Vec<Kvpair>> for CommandResponse {
+    fn from(pairs: Vec<Kvpair>) -> Self {
+        Self {
+            status: StatusCode::OK.as_u16() as _,
+            kvpairs: pairs,
+            ..Default::default()
         }
     }
 }

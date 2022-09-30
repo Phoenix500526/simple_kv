@@ -23,6 +23,30 @@ pub trait Storage {
     fn get_iter(&self, table: &str) -> Result<Box<dyn Iterator<Item = Kvpair>>, KvError>;
 }
 
+/// 提供 Storage Iterator 来对 iter 进行抽象，这样 trait 的实现者
+/// 只需要将它们的 iterator 提供了 StorageIter，然后它们保证 next()
+/// 传出的类型实现了 Into<Kvpair> 即可
+pub struct StorageIter<T> {
+    iter: T,
+}
+
+impl<T> StorageIter<T> {
+    pub fn new(iter: T) -> Self {
+        Self { iter }
+    }
+}
+
+impl<T> Iterator for StorageIter<T>
+where
+    T: Iterator,
+    T::Item: Into<Kvpair>,
+{
+    type Item = Kvpair;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|v| v.into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

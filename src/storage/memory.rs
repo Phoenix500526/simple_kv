@@ -1,4 +1,4 @@
-use crate::{KvError, Kvpair, Storage, Value};
+use crate::{KvError, Kvpair, Storage, StorageIter, Value};
 use dashmap::{mapref::one::Ref, DashMap};
 
 /// 基于 DashMap 构造 MemTable，实现 Storage Trait
@@ -58,7 +58,8 @@ impl Storage for MemTable {
         // 而 into_iter 的 receiver_type 是 self，而非 self&。因此，在 DashMap 没有实现 Copy Trait 的前提下
         // 这里会发生 move。因此我们需要通过 clone 获得 table 的快照，并对快照进行操作
         let table = self.get_or_create_table(table).clone();
-        Ok(Box::new(table.into_iter().map(|data| data.into())))
+        let iter = StorageIter::new(table.into_iter());
+        Ok(Box::new(iter))
     }
 }
 

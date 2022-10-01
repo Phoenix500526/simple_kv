@@ -10,8 +10,14 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let service: Service<SledDb> = ServiceInner::new(SledDb::new("/tmp/kvserver"))
         .fn_before_send(|res| match res.message.as_ref() {
-            "" => res.message = "altered. Original message is empty.".into(),
-            s => res.message = format!("altered: {}", s),
+            "" => {
+                res.message = "altered. Original message is empty.".into();
+                Ok(())
+            }
+            s => {
+                res.message = format!("altered: {}", s);
+                Ok(())
+            }
         })
         .into();
     let addr = "127.0.0.1:9527";

@@ -1,7 +1,7 @@
 use crate::Value;
 use thiserror::Error;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum KvError {
     #[error("Not found for table: {0}, key: {1}")]
     NotFound(String, String),
@@ -26,4 +26,10 @@ pub enum KvError {
 
     #[error("Failed to access sled db")]
     SledError(#[from] sled::Error),
+
+    #[error("Frame is too large")]
+    FrameError,
+
+    #[error("I/O error")]
+    IOError(#[from] std::io::Error),
 }

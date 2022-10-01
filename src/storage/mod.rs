@@ -110,13 +110,13 @@ mod tests {
         let v = store.get("t1", "k2").unwrap();
         assert!(v.is_none());
 
-        assert_eq!(store.contains("t1", "k1"), Ok(true));
-        assert_eq!(store.contains("t1", "k3"), Ok(false));
-        assert_eq!(store.contains("t3", "k1"), Ok(false));
+        assert!(store.contains("t1", "k1").unwrap());
+        assert!(!store.contains("t1", "k3").unwrap());
+        assert!(!store.contains("t3", "k1").unwrap());
 
         let v = store.del("t1", "k1").unwrap();
         assert_eq!(v, Some("v2".into()));
-        assert_eq!(store.contains("t1", "k1"), Ok(false));
+        assert!(!store.contains("t1", "k1").unwrap());
 
         let v = store.del("t2", "k1").unwrap();
         assert!(v.is_none());

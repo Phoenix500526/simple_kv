@@ -3,6 +3,7 @@ pub mod abi;
 use abi::{command_request::RequestData, *};
 use bytes::Bytes;
 use http::StatusCode;
+use prost::Message;
 
 use crate::KvError;
 
@@ -150,6 +151,24 @@ impl From<bool> for Value {
         Self {
             value: Some(value::Value::Bool(b)),
         }
+    }
+}
+
+impl TryFrom<&[u8]> for Value {
+    type Error = KvError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let msg = Value::decode(data)?;
+        Ok(msg)
+    }
+}
+
+impl TryFrom<Value> for Vec<u8> {
+    type Error = KvError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let mut buf = Vec::with_capacity(value.encoded_len());
+        value.encode(&mut buf)?;
+        Ok(buf)
     }
 }
 

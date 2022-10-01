@@ -1,7 +1,10 @@
 use crate::{KvError, Kvpair, Value};
 
 mod memory;
+mod sleddb;
 pub use memory::MemTable;
+pub use sleddb::SledDb;
+
 /// 对存储的抽象，定义了外界如何与后端打交道
 pub trait Storage {
     /// 从一个 HashTable 里获得一个 key 的 value
@@ -50,6 +53,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn memtable_basic_interfaces_should_work() {
@@ -66,6 +70,26 @@ mod tests {
     #[test]
     fn memtable_get_iter_should_work() {
         let store = MemTable::new();
+        test_get_iter_should_work(store);
+    }
+
+    #[test]
+    fn sleddb_basic_interface_should_work() {
+        let dir = tempdir().unwrap();
+        let store = SledDb::new(dir);
+        test_basic_interfaces_should_work(store);
+    }
+
+    #[test]
+    fn sleddb_get_all_should_work() {
+        let dir = tempdir().unwrap();
+        let store = SledDb::new(dir);
+        test_get_all_should_work(store);
+    }
+    #[test]
+    fn sleddb_iter_should_work() {
+        let dir = tempdir().unwrap();
+        let store = SledDb::new(dir);
         test_get_iter_should_work(store);
     }
 

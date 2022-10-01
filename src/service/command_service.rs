@@ -108,7 +108,6 @@ impl CommandService for Hmexist {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command_request::RequestData;
 
     #[test]
     fn hget_should_work() {
@@ -229,36 +228,6 @@ mod tests {
         let cmd = CommandRequest::new_hmexist("t1", vec!["u1".into(), "u3".into()]);
         let res = dispatch(cmd, &store);
         assert_res_ok(res, &[true.into(), false.into()], &[]);
-    }
-
-    fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
-        match cmd.request_data {
-            Some(RequestData::Hget(v)) => v.execute(store),
-            Some(RequestData::Hmget(v)) => v.execute(store),
-            Some(RequestData::Hgetall(v)) => v.execute(store),
-            Some(RequestData::Hset(v)) => v.execute(store),
-            Some(RequestData::Hmset(v)) => v.execute(store),
-            Some(RequestData::Hdel(v)) => v.execute(store),
-            Some(RequestData::Hmdel(v)) => v.execute(store),
-            Some(RequestData::Hexist(v)) => v.execute(store),
-            Some(RequestData::Hmexist(v)) => v.execute(store),
-            None => KvError::InvalidCommand("Request has no data".into()).into(),
-        }
-    }
-
-    fn assert_res_ok(mut res: CommandResponse, values: &[Value], pairs: &[Kvpair]) {
-        res.kvpairs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        assert_eq!(res.status, 200);
-        assert_eq!(res.message, "");
-        assert_eq!(res.values, values);
-        assert_eq!(res.kvpairs, pairs);
-    }
-
-    fn assert_res_error(res: CommandResponse, code: u32, msg: &str) {
-        assert_eq!(res.status, code);
-        assert!(res.message.contains(msg));
-        assert_eq!(res.values, &[]);
-        assert_eq!(res.kvpairs, &[]);
     }
 
     fn set_key_pairs<T: Into<Value>>(table: &str, pairs: Vec<(&str, T)>, store: &impl Storage) {

@@ -32,4 +32,10 @@ pub enum KvError {
 
     #[error("I/O error")]
     IOError(#[from] std::io::Error),
+
+    #[error("Certificate parse error: error to load {0} {1}")]
+    CertificateParseError(&'static str, &'static str),
+
+    #[error("TLS error")]
+    TlsError(#[from] tokio_rustls::rustls::TLSError),
 }

@@ -6,8 +6,11 @@ use tracing::info;
 #[tokio::main]
 async fn main() -> Result<()> {
     let ca_cert = include_str!("../fixtures/ca.cert");
+    let client_cert = include_str!("../fixtures/client.cert");
+    let client_key = include_str!("../fixtures/client.key");
+    let client_identity = Some((client_cert, client_key));
     let addr = "127.0.0.1:9527";
-    let connector = TlsClientConnector::new("kvserver.acme.inc", None, Some(ca_cert))?;
+    let connector = TlsClientConnector::new("kvserver.acme.inc", client_identity, Some(ca_cert))?;
     let stream = TcpStream::connect(addr).await?;
     let stream = connector.connect(stream).await?;
 

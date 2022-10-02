@@ -110,28 +110,8 @@ where
 mod tests {
     use super::*;
     use crate::Value;
+    use crate::{utils::DummyStream, CommandRequest};
     use bytes::Bytes;
-    use std::task::{Context, Poll};
-
-    struct DummyStream {
-        buf: BytesMut,
-    }
-
-    impl AsyncRead for DummyStream {
-        fn poll_read(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            buf: &mut tokio::io::ReadBuf<'_>,
-        ) -> Poll<std::io::Result<()>> {
-            let len = buf.capacity();
-
-            let data = self.get_mut().buf.split_to(len);
-
-            buf.put_slice(&data);
-
-            Poll::Ready(Ok(()))
-        }
-    }
 
     #[tokio::test]
     async fn read_frame_should_work() {

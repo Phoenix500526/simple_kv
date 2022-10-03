@@ -89,6 +89,18 @@ impl CommandRequest {
     }
 }
 
+impl Value {
+    pub fn format(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+impl CommandResponse {
+    pub fn format(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 impl Kvpair {
     /// 创建一个新的 kvpair
     pub fn new(key: impl Into<String>, value: Value) -> Self {
@@ -172,6 +184,26 @@ impl TryFrom<Value> for Vec<u8> {
     }
 }
 
+impl TryFrom<Value> for i64 {
+    type Error = KvError;
+    fn try_from(v: Value) -> Result<Self, Self::Error> {
+        match v.value {
+            Some(value::Value::Integer(i)) => Ok(i),
+            _ => Err(KvError::ConvertError(v.format(), "Integer")),
+        }
+    }
+}
+
+impl TryFrom<&Value> for i64 {
+    type Error = KvError;
+    fn try_from(v: &Value) -> Result<Self, Self::Error> {
+        match v.value {
+            Some(value::Value::Integer(i)) => Ok(i),
+            _ => Err(KvError::ConvertError(v.format(), "Integer")),
+        }
+    }
+}
+
 impl From<Value> for CommandResponse {
     fn from(value: Value) -> Self {
         Self {
@@ -216,6 +248,20 @@ impl From<Vec<Kvpair>> for CommandResponse {
             status: StatusCode::OK.as_u16() as _,
             kvpairs: pairs,
             ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<&CommandResponse> for i64 {
+    type Error = KvError;
+
+    fn try_from(value: &CommandResponse) -> Result<Self, Self::Error> {
+        if value.status != StatusCode::OK.as_u16() as u32 {
+            return Err(KvError::ConvertError(value.format(), "CommandResponse"));
+        }
+        match value.values.get(0) {
+            Some(v) => v.try_into(),
+            None => Err(KvError::ConvertError(value.format(), "CommandResponse")),
         }
     }
 }

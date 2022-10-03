@@ -3,6 +3,7 @@ use crate::*;
 use std::sync::Arc;
 use tracing::debug;
 mod command_service;
+mod topic;
 
 /// 对 Command 的处理进行抽象
 pub trait CommandService {
@@ -145,6 +146,7 @@ pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
         Some(RequestData::Hexist(v)) => v.execute(store),
         Some(RequestData::Hmexist(v)) => v.execute(store),
         None => KvError::InvalidCommand("Request has no data".into()).into(),
+        _ => Value::default().into(),
     }
 }
 
@@ -162,12 +164,12 @@ mod tests {
         let cloned = service.clone();
         let handle = thread::spawn(move || {
             let res = cloned.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
-            assert_res_ok(res, &[Value::default()], &[]);
+            assert_res_ok(&res, &[Value::default()], &[]);
         });
         handle.join().unwrap();
 
         let res = service.execute(CommandRequest::new_hget("t1", "k1"));
-        assert_res_ok(res, &["v1".into()], &[]);
+        assert_res_ok(&res, &["v1".into()], &[]);
     }
 
     #[test]
@@ -232,7 +234,7 @@ mod tests {
 
         let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
         assert_res_error(
-            res,
+            &res,
             StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
             "Something went wrong",
         );
@@ -275,7 +277,7 @@ mod tests {
 
         let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
         assert_res_error(
-            res,
+            &res,
             StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
             "Something went wrong",
         );
@@ -284,16 +286,17 @@ mod tests {
 
 // 如果要在 command_service.rs 中调用 assert_res_ok，则 pub 是必要的
 #[cfg(test)]
-pub fn assert_res_ok(mut res: CommandResponse, values: &[Value], pairs: &[Kvpair]) {
-    res.kvpairs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+pub fn assert_res_ok(res: &CommandResponse, values: &[Value], pairs: &[Kvpair]) {
+    let mut sorted_pairs = res.kvpairs.clone();
+    sorted_pairs.sort_by(|a, b| a.partial_cmp(b).unwrap());
     assert_eq!(res.status, 200);
     assert_eq!(res.message, "");
     assert_eq!(res.values, values);
-    assert_eq!(res.kvpairs, pairs);
+    assert_eq!(sorted_pairs, pairs);
 }
 
 #[cfg(test)]
-pub fn assert_res_error(res: CommandResponse, code: u32, msg: &str) {
+pub fn assert_res_error(res: &CommandResponse, code: u32, msg: &str) {
     assert_eq!(res.status, code);
     assert!(res.message.contains(msg));
     assert_eq!(res.values, &[]);

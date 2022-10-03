@@ -7,7 +7,15 @@ fn main() {
     // 为 protobuf 生成的协议添加偏序 Trait
     config.type_attribute(".", "#[derive(PartialOrd)]");
     for item in [
-        "Hgetall", "Hget", "Hmget", "Hdel", "Hmdel", "Hexist", "Hmexist",
+        "Hgetall",
+        "Hget",
+        "Hmget",
+        "Hdel",
+        "Hmdel",
+        "Hexist",
+        "Hmexist",
+        "Subscribe",
+        "Unsubscribe",
     ] {
         config.type_attribute(item, "#[derive(Eq)]");
     }

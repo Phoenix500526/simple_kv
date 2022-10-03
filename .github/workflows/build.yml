@@ -1,6 +1,6 @@
 name: build
 
-on: 
+on:
   push:
     branches:
       - main
@@ -8,9 +8,9 @@ on:
     branches:
       - main
 
-jobs: 
+jobs:
   build-rust:
-    strategy: 
+    strategy:
       matrix:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
@@ -37,6 +37,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Generate cert pem files
+        run: cargo run --example gen_cert
       - name: Check code format
         run: cargo fmt -- --check
       - name: Check the package for errors

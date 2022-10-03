@@ -1,4 +1,5 @@
 mod frame;
+mod multiplex;
 mod stream;
 mod tls;
 use crate::{CommandRequest, CommandResponse, KvError, Service};
@@ -129,6 +130,7 @@ mod tests {
 pub mod utils {
     use anyhow::Result;
     use bytes::{BufMut, BytesMut};
+    use std::cmp::min;
     use std::task::{Context, Poll};
     use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -143,10 +145,9 @@ pub mod utils {
             _cx: &mut Context<'_>,
             buf: &mut tokio::io::ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            let len = buf.capacity();
-
-            let data = self.get_mut().buf.split_to(len);
-
+            let this = self.get_mut();
+            let len = min(buf.capacity(), this.buf.len());
+            let data = this.buf.split_to(len);
             buf.put_slice(&data);
 
             Poll::Ready(Ok(()))

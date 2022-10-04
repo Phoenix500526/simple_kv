@@ -39,6 +39,8 @@ jobs:
           override: true
       - name: Generate cert pem files
         run: cargo run --example gen_cert
+      - name: Generate config files
+        run: cargo run --example gen_config
       - name: Check code format
         run: cargo fmt -- --check
       - name: Check the package for errors

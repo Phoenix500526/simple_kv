@@ -32,6 +32,8 @@ futures = "0.3" # 提供 Stream Trait
 tokio-util = { version = "0.6", features = ["compat"] }
 yamux = "0.9"
 tokio-stream = "0.1.10"
+serde = { version ="1", features = ["derive"] } # 序列化/反序列化
+toml = "0.5"    # toml 支持
 
 [dev-dependencies]
 async-prost = "0.2.1"

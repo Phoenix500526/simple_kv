@@ -37,4 +37,7 @@ pub enum KvError {
 
     #[error("TLS error")]
     TlsError(#[from] tokio_rustls::rustls::TLSError),
+
+    #[error("Deserialize/Serialize error")]
+    DeserializeError(#[from] toml::de::Error),
 }

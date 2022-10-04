@@ -87,6 +87,32 @@ impl CommandRequest {
             })),
         }
     }
+
+    pub fn new_subscribe(topic: impl Into<String>) -> Self {
+        Self {
+            request_data: Some(RequestData::Subscribe(Subscribe {
+                topic: topic.into(),
+            })),
+        }
+    }
+
+    pub fn new_unsubscribe(topic: impl Into<String>, id: u32) -> Self {
+        Self {
+            request_data: Some(RequestData::Unsubscribe(Unsubscribe {
+                topic: topic.into(),
+                id,
+            })),
+        }
+    }
+
+    pub fn new_publish(topic: impl Into<String>, values: Vec<Value>) -> Self {
+        Self {
+            request_data: Some(RequestData::Publish(Publish {
+                topic: topic.into(),
+                value: values,
+            })),
+        }
+    }
 }
 
 impl Value {
@@ -96,6 +122,12 @@ impl Value {
 }
 
 impl CommandResponse {
+    pub fn ok() -> Self {
+        Self {
+            status: StatusCode::OK.as_u16() as _,
+            ..Default::default()
+        }
+    }
     pub fn format(&self) -> String {
         format!("{:?}", self)
     }
@@ -224,7 +256,7 @@ impl From<KvError> for CommandResponse {
         };
 
         match error {
-            KvError::NotFound(_, _) => result.status = StatusCode::NOT_FOUND.as_u16() as _,
+            KvError::NotFound(_) => result.status = StatusCode::NOT_FOUND.as_u16() as _,
             KvError::InvalidCommand(_) => result.status = StatusCode::BAD_REQUEST.as_u16() as _,
             _ => {}
         }

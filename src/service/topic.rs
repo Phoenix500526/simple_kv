@@ -1,4 +1,4 @@
-use crate::{CommandResponse, Value};
+use crate::{CommandResponse, KvError, Value};
 use dashmap::{DashMap, DashSet};
 use std::sync::{
     atomic::{AtomicU32, Ordering},
@@ -23,7 +23,7 @@ pub trait Topic: Send + Sync + 'static {
     fn subscribe(self, name: String) -> mpsc::Receiver<Arc<CommandResponse>>;
 
     /// 退订某个主题
-    fn unsubscribe(self, name: String, id: u32);
+    fn unsubscribe(self, name: String, id: u32) -> Result<u32, KvError>;
 
     /// 往主题里面发布某内容
     fn publish(self, name: String, value: Arc<CommandResponse>);
@@ -36,6 +36,22 @@ pub struct Broadcaster {
     topics: DashMap<String, DashSet<u32>>,
     /// 所有的订阅列表
     subscriptions: DashMap<u32, mpsc::Sender<Arc<CommandResponse>>>,
+}
+
+impl Broadcaster {
+    fn remove_subscription(&self, name: String, id: u32) -> Option<u32> {
+        if let Some(v) = self.topics.get_mut(&name) {
+            v.remove(&id);
+
+            if v.is_empty() {
+                info!("Topic: {:?} is deleted", &name);
+                drop(v);
+                self.topics.remove(&name);
+            }
+        }
+        debug!("Subscription {} is removed!", id);
+        self.subscriptions.remove(&id).map(|(id, _)| id)
+    }
 }
 
 impl Topic for Arc<Broadcaster> {
@@ -68,35 +84,39 @@ impl Topic for Arc<Broadcaster> {
         rx
     }
 
-    fn unsubscribe(self, name: String, id: u32) {
-        if let Some(v) = self.topics.get_mut(&name) {
-            v.remove(&id);
-
-            if v.is_empty() {
-                info!("Topic: {:?} is deleted", &name);
-                drop(v);
-                self.topics.remove(&name);
-            }
+    fn unsubscribe(self, name: String, id: u32) -> Result<u32, KvError> {
+        match self.remove_subscription(name, id) {
+            Some(v) => Ok(v),
+            None => Err(KvError::NotFound(format!("subscription {}", id))),
         }
-        debug!("Subscription {} is removed!", id);
-        self.subscriptions.remove(&id);
     }
 
     fn publish(self, name: String, value: Arc<CommandResponse>) {
         // 使用 tokio 来包装，避免阻塞
         tokio::spawn(async move {
-            match self.topics.get(&name) {
-                Some(entry) => {
-                    let id_table = entry.value().clone();
-                    for id in id_table.into_iter() {
-                        if let Some(tx) = self.subscriptions.get(&id) {
-                            if let Err(e) = tx.send(value.clone()).await {
-                                warn!("Publish to {} failed! error: {:?}", id, e);
-                            }
+            let mut ids = vec![];
+            if let Some(topic) = self.topics.get(&name) {
+                // 复制整个 topic 下所有的 subscription id
+                // 这里我们每个 id 是 u32，如果一个 topic 下有 10k 订阅，复制的成本
+                // 也就是 40k 堆内存（外加一些控制结构），所以效率不算差
+                // 这也是为什么我们用 NEXT_ID 来控制 subscription id 的生成
+                let subscriptions = topic.value().clone();
+
+                // 尽快释放锁
+                drop(topic);
+                for id in subscriptions.into_iter() {
+                    if let Some(tx) = self.subscriptions.get(&id) {
+                        if let Err(e) = tx.send(value.clone()).await {
+                            warn!("Publish to {} failed! error: {:?}", id, e);
+                            // client 中断连接
+                            ids.push(id);
                         }
                     }
                 }
-                None => {}
+
+                for id in ids {
+                    self.remove_subscription(name.clone(), id);
+                }
             }
         });
     }
@@ -128,7 +148,8 @@ mod tests {
         assert_eq!(res1, res2);
         assert_res_ok(&res1, &[v.clone()], &[]);
 
-        b.clone().unsubscribe(topic.clone(), id1 as _);
+        let result = b.clone().unsubscribe(topic.clone(), id1 as _).unwrap();
+        assert_eq!(result, id1 as u32);
 
         let v: Value = "world".into();
         b.clone().publish(topic, Arc::new(v.clone().into()));

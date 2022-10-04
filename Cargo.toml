@@ -31,6 +31,7 @@ rustls-native-certs = "0.5" # 加载本机信任证书
 futures = "0.3" # 提供 Stream Trait
 tokio-util = { version = "0.6", features = ["compat"] }
 yamux = "0.9"
+tokio-stream = "0.1.10"
 
 [dev-dependencies]
 async-prost = "0.2.1"

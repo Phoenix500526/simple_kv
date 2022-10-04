@@ -35,8 +35,13 @@ async fn main() -> Result<()> {
             while let Some(Ok(msg)) = stream.next().await {
                 let cmd = CommandRequest::decode(msg).unwrap();
                 info!("Got a new command: {:?}", cmd);
-                let res = svc.execute(cmd);
-                stream.send(Bytes::from(res.encode_to_vec())).await.unwrap();
+                let mut res = svc.execute(cmd);
+                while let Some(data) = res.next().await {
+                    stream
+                        .send(Bytes::from((*data).clone().encode_to_vec()))
+                        .await
+                        .unwrap();
+                }
             }
             info!("Client {:?} disconnected", addr);
         });

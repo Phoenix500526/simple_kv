@@ -1,9 +1,15 @@
 use crate::command_request::*;
 use crate::*;
+use futures::stream;
 use std::sync::Arc;
 use tracing::debug;
 mod command_service;
 mod topic;
+mod topic_service;
+pub use self::{
+    topic::{Broadcaster, Topic},
+    topic_service::{StreamingResponse, TopicService},
+};
 
 /// 对 Command 的处理进行抽象
 pub trait CommandService {
@@ -15,12 +21,14 @@ pub trait CommandService {
 /// 避免向用户暴露底层细节
 pub struct Service<Store = MemTable> {
     inner: Arc<ServiceInner<Store>>,
+    brocaster: Arc<Broadcaster>,
 }
 
 impl<Store> Clone for Service<Store> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
+            brocaster: Arc::clone(&self.brocaster),
         }
     }
 }
@@ -40,23 +48,28 @@ pub struct ServiceInner<Store> {
 }
 
 impl<Store: Storage> Service<Store> {
-    pub fn execute(&self, cmd: CommandRequest) -> CommandResponse {
+    pub fn execute(&self, cmd: CommandRequest) -> StreamingResponse {
         debug!("Got request: {:?}", cmd);
         if let Err(e) = self.inner.on_received.notify(&cmd) {
-            return e;
+            return Box::pin(stream::once(async { Arc::new(e) }));
         }
-        let mut res = dispatch(cmd, &self.inner.store);
-        debug!("Executed response: {:?}", res);
-        if let Err(e) = self.inner.on_executed.notify(&res) {
-            return e;
+        let mut res = dispatch(cmd.clone(), &self.inner.store);
+
+        if res == CommandResponse::default() {
+            dispatch_stream(cmd, Arc::clone(&self.brocaster))
+        } else {
+            debug!("Executed response: {:?}", res);
+            if let Err(e) = self.inner.on_executed.notify(&res) {
+                return Box::pin(stream::once(async { Arc::new(e) }));
+            }
+            if let Err(e) = self.inner.on_before_send.notify(&mut res) {
+                return Box::pin(stream::once(async { Arc::new(e) }));
+            }
+            if !self.inner.on_after_send.is_empty() {
+                debug!("Modified response: {:?}", res);
+            }
+            Box::pin(stream::once(async { Arc::new(res) }))
         }
-        if let Err(e) = self.inner.on_before_send.notify(&mut res) {
-            return e;
-        }
-        if !self.inner.on_after_send.is_empty() {
-            debug!("Modified response: {:?}", res);
-        }
-        res
     }
 }
 
@@ -96,6 +109,7 @@ impl<Store: Storage> From<ServiceInner<Store>> for Service<Store> {
     fn from(inner: ServiceInner<Store>) -> Self {
         Self {
             inner: Arc::new(inner),
+            brocaster: Default::default(),
         }
     }
 }
@@ -150,30 +164,45 @@ pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
     }
 }
 
+/// 从 Request 中得到 Response，目前处理所有 PUBLISH/SUBSCRIBE/UNSUBSCRIBE
+pub fn dispatch_stream(cmd: CommandRequest, topic: impl Topic) -> StreamingResponse {
+    match cmd.request_data {
+        Some(RequestData::Publish(param)) => param.execute(topic),
+        Some(RequestData::Subscribe(param)) => param.execute(topic),
+        Some(RequestData::Unsubscribe(param)) => param.execute(topic),
+        _ => unreachable!(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{MemTable, Value};
     use http::StatusCode;
-    use std::thread;
+    use tokio_stream::StreamExt;
     use tracing::info;
 
-    #[test]
-    fn service_should_work() {
+    #[tokio::test]
+    async fn service_should_work() {
         let service: Service = ServiceInner::new(MemTable::default()).into();
+        // service 可以运行在多线程环境下，它的 clone 应该是轻量级的
         let cloned = service.clone();
-        let handle = thread::spawn(move || {
-            let res = cloned.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
-            assert_res_ok(&res, &[Value::default()], &[]);
-        });
-        handle.join().unwrap();
 
-        let res = service.execute(CommandRequest::new_hget("t1", "k1"));
-        assert_res_ok(&res, &["v1".into()], &[]);
+        tokio::spawn(async move {
+            let mut res = cloned.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+            let data = res.next().await.unwrap();
+            assert_res_ok(&data, &[Value::default()], &[]);
+        })
+        .await
+        .unwrap();
+
+        let mut res = service.execute(CommandRequest::new_hget("t1", "k1"));
+        let data = res.next().await.unwrap();
+        assert_res_ok(&data, &["v1".into()], &[]);
     }
 
-    #[test]
-    fn event_registration_should_work() {
+    #[tokio::test]
+    async fn event_registration_should_work() {
         fn b(cmd: &CommandRequest) -> Result<(), KvError> {
             info!("Got {:?}", cmd);
             Ok(())
@@ -202,14 +231,15 @@ mod tests {
             .fn_after_send(e)
             .into();
 
-        let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
-        assert_eq!(res.status, StatusCode::CREATED.as_u16() as u32);
-        assert_eq!(res.message, "");
-        assert_eq!(res.values, vec![Value::default()]);
+        let mut res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+        let data = res.next().await.unwrap();
+        assert_eq!(data.status, StatusCode::CREATED.as_u16() as u32);
+        assert_eq!(data.message, "");
+        assert_eq!(data.values, vec![Value::default()]);
     }
 
-    #[test]
-    fn test_pipeline_should_return_early_when_something_went_wrong() {
+    #[tokio::test]
+    async fn test_pipeline_should_return_early_when_something_went_wrong() {
         fn b(cmd: &CommandRequest) -> Result<(), KvError> {
             info!("Got {:?}", cmd);
             Ok(())
@@ -232,16 +262,17 @@ mod tests {
             .fn_received(d)
             .into();
 
-        let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+        let mut res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+        let data = res.next().await.unwrap();
         assert_res_error(
-            &res,
+            &data,
             StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
             "Something went wrong",
         );
     }
 
-    #[test]
-    fn test_pipeline_should_return_early_when_mut_fn_went_wrong() {
+    #[tokio::test]
+    async fn test_pipeline_should_return_early_when_mut_fn_went_wrong() {
         fn b(cmd: &CommandRequest) -> Result<(), KvError> {
             info!("Got {:?}", cmd);
             Ok(())
@@ -275,9 +306,10 @@ mod tests {
             .fn_before_send(f)
             .into();
 
-        let res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+        let mut res = service.execute(CommandRequest::new_hset("t1", "k1", "v1".into()));
+        let data = res.next().await.unwrap();
         assert_res_error(
-            &res,
+            &data,
             StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
             "Something went wrong",
         );

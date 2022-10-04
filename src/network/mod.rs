@@ -1,11 +1,13 @@
 mod frame;
 mod multiplex;
 mod stream;
+mod stream_result;
 mod tls;
 use crate::{CommandRequest, CommandResponse, KvError, Service};
 pub use frame::{read_frame, FrameCoder};
 use futures::{SinkExt, StreamExt};
 pub use stream::ProstStream;
+pub use stream_result::StreamResult;
 pub use tls::{TlsClientConnector, TlsServerAcceptor};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
@@ -37,8 +39,10 @@ where
         let stream = &mut self.inner;
         while let Some(Ok(cmd)) = stream.next().await {
             info!("Got a new command: {:?}", cmd);
-            let res = self.service.execute(cmd);
-            stream.send(res).await?;
+            let mut res = self.service.execute(cmd);
+            while let Some(data) = res.next().await {
+                stream.send(&data).await.unwrap();
+            }
         }
         Ok(())
     }
@@ -46,7 +50,7 @@ where
 
 impl<S> ProstClientStream<S>
 where
-    S: AsyncRead + AsyncWrite + Unpin + Send,
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
     pub fn new(stream: S) -> ProstClientStream<S> {
         Self {
@@ -54,13 +58,20 @@ where
         }
     }
 
-    pub async fn execute(&mut self, cmd: CommandRequest) -> Result<CommandResponse, KvError> {
+    pub async fn execute(&mut self, cmd: &CommandRequest) -> Result<CommandResponse, KvError> {
         let stream = &mut self.inner;
         stream.send(cmd).await?;
         match stream.next().await {
             Some(v) => v,
             None => Err(KvError::Internal("Didn't get any response".into())),
         }
+    }
+
+    pub async fn execute_streaming(self, cmd: &CommandRequest) -> Result<StreamResult, KvError> {
+        let mut stream = self.inner;
+        stream.send(cmd).await?;
+        stream.close().await?;
+        StreamResult::new(stream).await
     }
 }
 
@@ -95,12 +106,12 @@ mod tests {
         let mut client = ProstClientStream::new(stream);
 
         let cmd = CommandRequest::new_hset("t1", "k1", "v1".into());
-        let res = client.execute(cmd).await.unwrap();
+        let res = client.execute(&cmd).await.unwrap();
 
         assert_res_ok(&res, &[Value::default()], &[]);
 
         let cmd = CommandRequest::new_hget("t1", "k1");
-        let res = client.execute(cmd).await.unwrap();
+        let res = client.execute(&cmd).await.unwrap();
 
         assert_res_ok(&res, &["v1".into()], &[]);
 
@@ -115,12 +126,12 @@ mod tests {
 
         let v: Value = Bytes::from(vec![0u8; 16384]).into();
         let cmd = CommandRequest::new_hset("t1", "k1", v.clone());
-        let res = client.execute(cmd).await.unwrap();
+        let res = client.execute(&cmd).await.unwrap();
 
         assert_res_ok(&res, &[Value::default()], &[]);
 
         let cmd = CommandRequest::new_hget("t1", "k1");
-        let res = client.execute(cmd).await.unwrap();
+        let res = client.execute(&cmd).await.unwrap();
         assert_res_ok(&res, &[v], &[]);
         Ok(())
     }

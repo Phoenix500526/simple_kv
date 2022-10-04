@@ -3,9 +3,10 @@ mod multiplex;
 mod stream;
 mod stream_result;
 mod tls;
-use crate::{CommandRequest, CommandResponse, KvError, Service};
+use crate::{CommandRequest, CommandResponse, KvError, Service, Storage};
 pub use frame::{read_frame, FrameCoder};
 use futures::{SinkExt, StreamExt};
+pub use multiplex::YamuxCtrl;
 pub use stream::ProstStream;
 pub use stream_result::StreamResult;
 pub use tls::{TlsClientConnector, TlsServerAcceptor};
@@ -13,9 +14,9 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
 /// 处理服务端某个 accept 下的 socket 读写
-pub struct ProstServerStream<S> {
+pub struct ProstServerStream<S, Store> {
     inner: ProstStream<S, CommandRequest, CommandResponse>,
-    service: Service,
+    service: Service<Store>,
 }
 
 /// 处理 Client socket 的读写
@@ -23,11 +24,12 @@ pub struct ProstClientStream<S> {
     inner: ProstStream<S, CommandResponse, CommandRequest>,
 }
 
-impl<S> ProstServerStream<S>
+impl<S, Store> ProstServerStream<S, Store>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send,
+    Store: Storage,
 {
-    pub fn new(stream: S, service: Service) -> Self {
+    pub fn new(stream: S, service: Service<Store>) -> Self {
         Self {
             inner: ProstStream::new(stream),
             service,

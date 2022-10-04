@@ -19,12 +19,12 @@ fn main() -> Result<()> {
         tls: ServerTlsConfig {
             cert: SERVER_CERT.into(),
             key: SERVER_KEY.into(),
-            ca: Some(CA_CERT.into()),
+            ca: None,
         },
     };
 
     fs::write(
-        "../fixtures/server.conf",
+        "fixtures/server.conf",
         toml::to_string_pretty(&server_config)?,
     )?;
 
@@ -37,6 +37,9 @@ fn main() -> Result<()> {
         },
     };
 
-    fs::write("../fixtures/client.conf", toml::to_string(&client_config)?)?;
+    fs::write(
+        "fixtures/client.conf",
+        toml::to_string_pretty(&client_config)?,
+    )?;
     Ok(())
 }

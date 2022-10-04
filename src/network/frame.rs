@@ -23,7 +23,7 @@ where
     /// 把一个 Message encode 成一个 frame, Message 可以是 CommandRequest
     fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), KvError> {
         let size = self.encoded_len();
-        if size >= MAX_FRAME {
+        if size > MAX_FRAME {
             return Err(KvError::FrameError);
         }
 
@@ -98,6 +98,7 @@ where
 {
     let header = stream.read_u32().await? as usize;
     let (len, _compressed) = decode_header(header);
+
     // 先分配至少一个 frame 的内存
     buf.reserve(LEN_LEN + len);
     buf.put_u32(header as _);

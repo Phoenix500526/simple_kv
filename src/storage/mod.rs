@@ -6,7 +6,7 @@ pub use memory::MemTable;
 pub use sleddb::SledDb;
 
 /// 对存储的抽象，定义了外界如何与后端打交道
-pub trait Storage {
+pub trait Storage: Send + Sync + 'static {
     /// 从一个 HashTable 里获得一个 key 的 value
     fn get(&self, table: &str, key: &str) -> Result<Option<Value>, KvError>;
 

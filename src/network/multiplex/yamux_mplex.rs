@@ -1,5 +1,4 @@
-#![allow(unused)]
-
+use crate::ProstClientStream;
 use futures::{future, Future, TryStreamExt};
 use std::marker::PhantomData;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -68,9 +67,11 @@ where
     }
 
     /// 打开一个新的 stream
-    pub async fn open_stream(&mut self) -> Result<Compat<yamux::Stream>, ConnectionError> {
+    pub async fn open_stream(
+        &mut self,
+    ) -> Result<ProstClientStream<Compat<yamux::Stream>>, ConnectionError> {
         let stream = self.ctrl.open_stream().await?;
-        Ok(stream.compat())
+        Ok(ProstClientStream::new(stream.compat()))
     }
 }
 
@@ -81,8 +82,8 @@ mod tests {
         assert_res_ok,
         network::tls::tls_utils::{tls_acceptor, tls_connector},
         utils::DummyStream,
-        CommandRequest, KvError, MemTable, ProstClientStream, ProstServerStream, Service,
-        ServiceInner, Storage, TlsServerAcceptor,
+        CommandRequest, KvError, MemTable, ProstServerStream, Service, ServiceInner, Storage,
+        TlsServerAcceptor,
     };
     use anyhow::Result;
     use std::net::SocketAddr;
@@ -148,6 +149,30 @@ mod tests {
 
         let stream = ctrl.open_stream().await;
         assert!(stream.is_ok());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn yamux_ctrl_client_server_should_work() -> Result<()> {
+        // 创建使用了 TLS 的 yamux server
+        let acceptor = tls_acceptor(false)?;
+        let addr = start_yamux_server("127.0.0.1:0", acceptor, MemTable::new()).await?;
+
+        // 创建使用了 TLS 的 yamux client
+        let connector = tls_connector(false)?;
+        let stream = TcpStream::connect(addr).await?;
+        let stream = connector.connect(stream).await?;
+
+        // 在 client ctrl 上打开一个新的 yamux stream
+        let mut ctrl = YamuxCtrl::new_client(stream, None);
+        let mut stream = ctrl.open_stream().await?;
+
+        let cmd = CommandRequest::new_hset("t1", "k1", "v1".into());
+        stream.execute(&cmd).await.unwrap();
+
+        let cmd = CommandRequest::new_hget("t1", "k1");
+        let res = stream.execute(&cmd).await.unwrap();
+        assert_res_ok(&res, &["v1".into()], &[]);
         Ok(())
     }
 }

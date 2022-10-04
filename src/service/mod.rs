@@ -160,7 +160,8 @@ pub fn dispatch(cmd: CommandRequest, store: &impl Storage) -> CommandResponse {
         Some(RequestData::Hexist(v)) => v.execute(store),
         Some(RequestData::Hmexist(v)) => v.execute(store),
         None => KvError::InvalidCommand("Request has no data".into()).into(),
-        _ => Value::default().into(),
+        // _ => Value::default().into(), Value 的默认值通过 into 转换得来的并不等同于 CommandResponse::default() 值
+        _ => CommandResponse::default(),
     }
 }
 

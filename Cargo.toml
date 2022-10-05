@@ -34,6 +34,8 @@ yamux = "0.9"
 tokio-stream = "0.1.10"
 serde = { version ="1", features = ["derive"] } # 序列化/反序列化
 toml = "0.5"    # toml 支持
+rand = "0.8"
+criterion = { version = "0.3", features = ["async_futures", "async_tokio", "html_reports"]} # benchmark
 
 [dev-dependencies]
 async-prost = "0.2.1"
@@ -43,3 +45,7 @@ certify = "0.3"
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
+
+[[bench]]
+name = "pubsub"
+harness = false

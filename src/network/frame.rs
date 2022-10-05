@@ -1,17 +1,16 @@
-use crate::{CommandRequest, CommandResponse, KvError};
+use crate::{compress, decompress, CommandRequest, CommandResponse, KvError, GZIP};
 use bytes::{Buf, BufMut, BytesMut};
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use prost::Message;
-use std::io::{Read, Write};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::debug;
 
 /// 长度整个占 4B
 pub const LEN_LEN: usize = 4;
 
-/// 最高 1 位 表示是否压缩，剩余 31 bit 表示长度，因此 frame 最大为 2G
-const MAX_FRAME: usize = 2 * 1024 * 1024;
-const COMPRESSION_BIT: usize = 1 << 31;
+/// 最高 2 位 表示是否压缩，剩余 30 bit 表示长度，因此 frame 最大为 1G
+const MAX_FRAME: usize = 1024 * 1024;
+const COMPRESSION_BIT: usize = 30;
+const COMPRESSION_MASK: usize = 3 << 30;
 
 /// 如果 payload 超过了 1436，则进行压缩，这样可以避免分片
 const COMPRESSION_LIMIT: usize = 1436;
@@ -20,8 +19,11 @@ pub trait FrameCoder
 where
     Self: Message + Sized + Default,
 {
-    /// 把一个 Message encode 成一个 frame, Message 可以是 CommandRequest
-    fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), KvError> {
+    fn encode_frame_with_compressor(
+        &self,
+        buf: &mut BytesMut,
+        compressor_type: usize,
+    ) -> Result<(), KvError> {
         let size = self.encoded_len();
         if size > MAX_FRAME {
             return Err(KvError::FrameError);
@@ -36,19 +38,14 @@ where
             self.encode(&mut buf_tmp)?;
 
             // step 2.2: 跳过开头的长度信息
-            let payload = buf.split_off(LEN_LEN);
+            let mut payload = buf.split_off(LEN_LEN);
             buf.clear();
 
             // step 2.3: 进行压缩
-            let mut encoder = GzEncoder::new(payload.writer(), Compression::default());
-            encoder.write_all(&buf_tmp[..])?;
-
-            // step 2.4: 压缩完成狗，将 gzip encoder 中的 BytesMut 拿回来
-            let payload = encoder.finish()?.into_inner();
-            debug!("Encode a frame: size {}({})", size, payload.len());
-
+            let len = compress(compressor_type, &buf_tmp, &mut payload)?;
+            debug!("Encode a frame size: {}({})", size, len);
             // step 2.5: 写入压缩后的长度
-            buf.put_u32((payload.len() | COMPRESSION_BIT) as _);
+            buf.put_u32((len | (GZIP << COMPRESSION_BIT)) as _);
 
             // step 2.6: 把 BytesMut 合并回来
             buf.unsplit(payload);
@@ -59,35 +56,32 @@ where
         }
     }
 
+    /// 把一个 Message encode 成一个 frame, Message 可以是 CommandRequest
+    fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), KvError> {
+        self.encode_frame_with_compressor(buf, GZIP)
+    }
+
     /// 把一个完整的 frame decode 成一个 Message
     fn decode_frame(buf: &mut BytesMut) -> Result<Self, KvError> {
-        // step 1: 读取 header，并取出相关的值
+        // step 1: 读取 header，并取出相关的值(注意：get_u32 后，position 会向前步进 4)
         let header = buf.get_u32() as usize;
         let (len, compressed) = decode_header(header);
         debug!("Got a frame: msg len {}, compressed {}", len, compressed);
-        if compressed {
-            // step 2：解压
-            let mut decoder = GzDecoder::new(&buf[..len]);
-            let mut buf_tmp = Vec::with_capacity(len * 2);
-            decoder.read_to_end(&mut buf_tmp)?;
-            buf.advance(len);
 
-            // step 3: decode 成相应的消息
-            Ok(Self::decode(&buf_tmp[..buf_tmp.len()])?)
-        } else {
-            let msg = Self::decode(&buf[..len])?;
-            buf.advance(len);
-            Ok(msg)
-        }
+        let mut buf_tmp = Vec::with_capacity(len * 2);
+        let src = buf.split_to(len);
+        decompress(compressed, &src, &mut buf_tmp)?;
+
+        Ok(Self::decode(&buf_tmp[..buf_tmp.len()])?)
     }
 }
 
 impl FrameCoder for CommandRequest {}
 impl FrameCoder for CommandResponse {}
 
-fn decode_header(header: usize) -> (usize, bool) {
-    let len = header & !COMPRESSION_BIT;
-    let compressed = header & COMPRESSION_BIT == COMPRESSION_BIT;
+fn decode_header(header: usize) -> (usize, usize) {
+    let len = header & !COMPRESSION_MASK;
+    let compressed = (header & COMPRESSION_MASK) >> COMPRESSION_BIT;
     (len, compressed)
 }
 
@@ -168,9 +162,9 @@ mod tests {
 
     fn is_compressed(buf: &BytesMut) -> bool {
         if let &[v] = &buf[..1] {
-            v >> 7 == 1
+            (v >> 6) != 0
         } else {
-            false
+            true
         }
     }
 }

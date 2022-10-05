@@ -1,9 +1,11 @@
+mod compress;
 mod frame;
 mod multiplex;
 mod stream;
 mod stream_result;
 mod tls;
 use crate::{CommandRequest, CommandResponse, KvError, Service, Storage};
+pub use compress::*;
 pub use frame::{read_frame, FrameCoder};
 use futures::{SinkExt, StreamExt};
 pub use multiplex::YamuxCtrl;

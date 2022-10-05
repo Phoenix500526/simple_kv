@@ -40,4 +40,10 @@ pub enum KvError {
 
     #[error("Deserialize/Serialize error")]
     DeserializeError(#[from] toml::de::Error),
+
+    #[error("Gzip Compression error")]
+    GzipComressionError(#[from] flate2::CompressError),
+
+    #[error("Gzip Decompression error")]
+    GzipDecompressionError(#[from] flate2::DecompressError),
 }

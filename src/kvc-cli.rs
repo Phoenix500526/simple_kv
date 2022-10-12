@@ -174,7 +174,8 @@ async fn hget(
     let cmd = CommandRequest::new_hget(table, key);
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
-        info!("GET: {:?}", data.values);
+        let value: String = data.values[0].clone().try_into().unwrap();
+        info!("GET: {:?}", value);
     } else {
         info!("{:?}", data.message);
     }
@@ -201,7 +202,16 @@ async fn hmget(
     let cmd = CommandRequest::new_hmget(table, keys.to_vec());
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
-        info!("GET: {:?}", data.values);
+        info!(
+            "GET: {:?}",
+            data.values
+                .into_iter()
+                .map(|v| {
+                    let value: String = v.try_into().unwrap();
+                    value
+                })
+                .collect::<Vec<_>>()
+        );
     } else {
         info!("{:?}", data.message);
     }
@@ -219,7 +229,16 @@ async fn hgetall(
     let cmd = CommandRequest::new_hgetall(table);
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
-        info!("GET: {:?}", data.kvpairs);
+        info!(
+            "GET: {:?}",
+            data.kvpairs
+                .into_iter()
+                .map(|pair| {
+                    let value: String = pair.value.expect("").try_into().unwrap();
+                    (pair.key, value)
+                })
+                .collect::<Vec<_>>()
+        );
     } else {
         info!("{:?}", data.message);
     }

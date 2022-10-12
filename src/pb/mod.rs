@@ -256,6 +256,26 @@ impl TryFrom<&Value> for bool {
     }
 }
 
+impl TryFrom<Value> for String {
+    type Error = KvError;
+    fn try_from(v: Value) -> Result<Self, Self::Error> {
+        match v.value {
+            Some(value::Value::String(s)) => Ok(s),
+            _ => Err(KvError::ConvertError(v.format(), "String")),
+        }
+    }
+}
+
+impl TryFrom<&Value> for String {
+    type Error = KvError;
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        match value.clone().value {
+            Some(value::Value::String(s)) => Ok(s),
+            _ => Err(KvError::ConvertError(value.format(), "String")),
+        }
+    }
+}
+
 impl From<Value> for CommandResponse {
     fn from(value: Value) -> Self {
         Self {

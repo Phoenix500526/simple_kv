@@ -13,6 +13,9 @@ path = "src/server.rs"
 name = "kvc"
 path = "src/client.rs"
 
+[[bin]]
+name = "kvc-cli"
+path = "src/kvc-cli.rs"
 
 [dependencies]
 anyhow = "1"    # 错误处理
@@ -38,12 +41,16 @@ rand = "0.8"
 criterion = { version = "0.3", features = ["async_futures", "async_tokio", "html_reports"]} # benchmark
 lz4 = "1.24"
 zstd = "0.11"
+shellfish = { version = "0.6", features = ["app", "async-std", "async"] }
+async-std = { version = "1", features = ["attributes"] }
 
 [dev-dependencies]
 async-prost = "0.2.1"
 tempfile = "3" # 处理临时目录和临时文件
 tokio-util = { version = "0.6", features = ["codec"] }
 certify = "0.3"
+
+
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf

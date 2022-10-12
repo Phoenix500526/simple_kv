@@ -236,6 +236,26 @@ impl TryFrom<&Value> for i64 {
     }
 }
 
+impl TryFrom<Value> for bool {
+    type Error = KvError;
+    fn try_from(v: Value) -> Result<Self, Self::Error> {
+        match v.value {
+            Some(value::Value::Bool(b)) => Ok(b),
+            _ => Err(KvError::ConvertError(v.format(), "bool")),
+        }
+    }
+}
+
+impl TryFrom<&Value> for bool {
+    type Error = KvError;
+    fn try_from(v: &Value) -> Result<Self, Self::Error> {
+        match v.value {
+            Some(value::Value::Bool(b)) => Ok(b),
+            _ => Err(KvError::ConvertError(v.format(), "bool")),
+        }
+    }
+}
+
 impl From<Value> for CommandResponse {
     fn from(value: Value) -> Self {
         Self {

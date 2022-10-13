@@ -6,7 +6,7 @@ use std::sync::{
 };
 
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// topic 里最大存放数据
 const BROCASTER_CAPACITY: usize = 128;
@@ -55,6 +55,7 @@ impl Broadcaster {
 }
 
 impl Topic for Arc<Broadcaster> {
+    #[instrument(name = "topic_subscribe", skip_all)]
     fn subscribe(self, name: String) -> mpsc::Receiver<Arc<CommandResponse>> {
         let id = {
             // topics 表中看看有没有 name 对应的 entry，有则获取，没有则创建
@@ -84,6 +85,7 @@ impl Topic for Arc<Broadcaster> {
         rx
     }
 
+    #[instrument(name = "topic_unsubscribe", skip_all)]
     fn unsubscribe(self, name: String, id: u32) -> Result<u32, KvError> {
         match self.remove_subscription(name, id) {
             Some(v) => Ok(v),
@@ -91,6 +93,7 @@ impl Topic for Arc<Broadcaster> {
         }
     }
 
+    #[instrument(name = "topic_publish", skip_all)]
     fn publish(self, name: String, value: Arc<CommandResponse>) {
         // 使用 tokio 来包装，避免阻塞
         tokio::spawn(async move {

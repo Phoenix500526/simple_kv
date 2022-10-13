@@ -8,7 +8,8 @@ use simple_kv::{
 };
 use tokio::{net::TcpStream, runtime::Builder, time, time::Duration};
 use tokio_rustls::client::TlsStream;
-use tracing::info;
+use tracing::{info, span};
+use tracing_subscriber::{layer::SubscriberExt, prelude::*, EnvFilter};
 
 async fn start_server() -> Result<()> {
     let addr = "127.0.0.1:8820";
@@ -54,6 +55,20 @@ async fn start_publisher(topic: &'static str, values: &'static [&'static str]) -
 }
 
 fn pubsub(c: &mut Criterion) {
+    let tracer = opentelemetry_jaeger::new_pipeline()
+        .with_service_name("kv-bench")
+        .install_simple()
+        .unwrap();
+
+    let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(opentelemetry)
+        .init();
+
+    let root = span!(tracing::Level::INFO, "app_start", work_units = 2);
+    let _enter = root.enter();
     // 创建 tokio runtime。由于我们所需要测试的函数(start_publisher, start_subscriber) 都是 async 函数
     // 因此我们需要先使用 runtime，普通函数则不需要
     let runtime = Builder::new_multi_thread()

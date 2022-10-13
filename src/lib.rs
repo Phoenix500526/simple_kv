@@ -15,7 +15,7 @@ use anyhow::Result;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::client;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tracing::info;
+use tracing::{info, instrument, span};
 
 async fn start_tls_server<Store: Storage>(
     addr: &str,
@@ -26,6 +26,8 @@ async fn start_tls_server<Store: Storage>(
     let service: Service<Store> = ServiceInner::new(store).into();
     info!("Start listening on {}", addr);
     loop {
+        let root = span!(tracing::Level::INFO, "server_process");
+        let _enter = root.enter();
         let tls = acceptor.clone();
         let (stream, addr) = listener.accept().await?;
         info!("Client {:?} connected", addr);
@@ -46,6 +48,7 @@ async fn start_tls_server<Store: Storage>(
 }
 
 /// 通过配置创建 kv 服务器
+#[instrument(skip_all)]
 pub async fn start_server_with_config(config: &ServerConfig) -> Result<()> {
     let acceptor =
         TlsServerAcceptor::new(&config.tls.cert, &config.tls.key, config.tls.ca.as_deref())?;
@@ -59,6 +62,7 @@ pub async fn start_server_with_config(config: &ServerConfig) -> Result<()> {
 }
 
 /// 通过配置创建 kv 客户端
+#[instrument(skip_all)]
 pub async fn start_client_with_config(
     config: &ClientConfig,
 ) -> Result<YamuxCtrl<client::TlsStream<TcpStream>>> {

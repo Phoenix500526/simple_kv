@@ -2,7 +2,7 @@ use crate::command_request::*;
 use crate::*;
 use futures::stream;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, instrument};
 mod command_service;
 mod topic;
 mod topic_service;
@@ -48,6 +48,7 @@ pub struct ServiceInner<Store> {
 }
 
 impl<Store: Storage> Service<Store> {
+    #[instrument(name = "service_execute", skip_all)]
     pub fn execute(&self, cmd: CommandRequest) -> StreamingResponse {
         debug!("Got request: {:?}", cmd);
         if let Err(e) = self.inner.on_received.notify(&cmd) {

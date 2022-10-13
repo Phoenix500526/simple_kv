@@ -1,6 +1,7 @@
 use anyhow::Result;
 use simple_kv::{
-    ClientConfig, ClientTlsConfig, GeneralConfig, ServerConfig, ServerTlsConfig, StorageConfig,
+    ClientConfig, ClientTlsConfig, GeneralConfig, LogConfig, RotationConfig, ServerConfig,
+    ServerTlsConfig, StorageConfig,
 };
 use std::fs;
 
@@ -20,6 +21,10 @@ fn main() -> Result<()> {
             cert: SERVER_CERT.into(),
             key: SERVER_KEY.into(),
             ca: None,
+        },
+        log: LogConfig {
+            path: "/tmp/kv-log".into(),
+            rotation: RotationConfig::Daily,
         },
     };
 

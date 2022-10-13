@@ -7,6 +7,7 @@ pub struct ServerConfig {
     pub general: GeneralConfig,
     pub storage: StorageConfig,
     pub tls: ServerTlsConfig,
+    pub log: LogConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -18,6 +19,19 @@ pub struct ClientConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GeneralConfig {
     pub addr: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LogConfig {
+    pub path: String,
+    pub rotation: RotationConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RotationConfig {
+    Hourly,
+    Daily,
+    Never,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

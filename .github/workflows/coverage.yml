@@ -12,9 +12,15 @@ jobs:
       - name:                   Checkout repository
         uses:                   actions/checkout@v2
 
+      - name: Generate cert pem files
+        run: cargo run --example gen_cert
+
+      - name: Generate config files
+        run: cargo run --example gen_config
+
       - name:                   Generate code coverage
         run: |
-          cargo +nightly tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --exclude-files kvc-cli.rs
+          cargo +nightly tarpaulin --all-features --workspace --timeout 120 --out Xml --exclude-files kvc-cli.rs
 
       - name:                   Upload to codecov.io
         uses:                   codecov/codecov-action@v2

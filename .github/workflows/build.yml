@@ -9,8 +9,8 @@ on:
       - main
 
 jobs:
-  test:
-    name:                       coverage
+  build-rust:
+    name:                       build
     runs-on:                    ubuntu-latest
     container:
       image:                    xd009642/tarpaulin:develop-nightly

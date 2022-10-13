@@ -41,8 +41,8 @@ rand = "0.8"
 criterion = { version = "0.3", features = ["async_futures", "async_tokio", "html_reports"]} # benchmark
 lz4 = "1.24"
 zstd = "0.11"
-shellfish = { version = "0.6", features = ["app", "async-std", "async"] }
-async-std = { version = "1", features = ["attributes"] }
+shellfish = { version = "0.6", features = ["async"] }
+
 
 [dev-dependencies]
 async-prost = "0.2.1"

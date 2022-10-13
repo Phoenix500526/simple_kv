@@ -10,7 +10,7 @@ struct CertPem {
 
 fn create_ca() -> Result<CertPem> {
     let (cert, key) = generate_ca(
-        &["acme.inc"],
+        ["acme.inc"],
         "CN",
         "Acme Inc.",
         "Acme CA",

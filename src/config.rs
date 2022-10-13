@@ -7,6 +7,7 @@ pub struct ServerConfig {
     pub general: GeneralConfig,
     pub storage: StorageConfig,
     pub tls: ServerTlsConfig,
+    pub log: LogConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -18,6 +19,31 @@ pub struct ClientConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GeneralConfig {
     pub addr: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LogConfig {
+    pub path: String,
+    pub rotation: RotationConfig,
+    pub level: LevelConfig,
+    pub enable_log_file: bool,
+    pub enable_jager: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RotationConfig {
+    Hourly,
+    Daily,
+    Never,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LevelConfig {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

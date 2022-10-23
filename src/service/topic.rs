@@ -62,6 +62,16 @@ impl Broadcaster {
         self.subscriptions.remove(&id).map(|(id, _)| id)
     }
 
+    fn purge_topic(&self) {
+        for element in self.topics.iter() {
+            for id in element.value().iter() {
+                if (*self.subscriptions.get(&*id).unwrap()).is_closed() {
+                    self.remove_subscription(element.key().clone(), *id);
+                }
+            }
+        }
+    }
+
     fn remove_pattern(&self, pattern: Pattern, id: u32) -> Option<u32> {
         if let Some(v) = self.patterns.get_mut(&pattern) {
             v.remove(&id);
@@ -74,6 +84,16 @@ impl Broadcaster {
         }
         debug!("Subscription {} is removed!", id);
         self.subscriptions.remove(&id).map(|(id, _)| id)
+    }
+
+    fn purge_patterns(&self) {
+        for element in self.patterns.iter() {
+            for id in element.value().iter() {
+                if (*self.subscriptions.get(&*id).unwrap()).is_closed() {
+                    self.remove_pattern(element.key().clone(), *id);
+                }
+            }
+        }
     }
 }
 
@@ -141,19 +161,23 @@ impl Topic for Arc<Broadcaster> {
 
     #[instrument(name = "topic_unsubscribe", skip_all)]
     fn unsubscribe(self, name: String, id: u32) -> Result<u32, KvError> {
-        match self.remove_subscription(name, id) {
+        let res = match self.remove_subscription(name, id) {
             Some(v) => Ok(v),
             None => Err(KvError::NotFound(format!("subscription {}", id))),
-        }
+        };
+        self.purge_topic();
+        res
     }
 
     #[instrument(name = "pattern_unsubscribe", skip_all)]
     fn punsubscribe(self, pattern: &'static str, id: u32) -> Result<u32, KvError> {
         let pattern = Pattern::new(pattern).unwrap();
-        match self.remove_pattern(pattern, id) {
+        let res = match self.remove_pattern(pattern, id) {
             Some(v) => Ok(v),
             None => Err(KvError::NotFound(format!("pattern {}", id))),
-        }
+        };
+        self.purge_patterns();
+        res
     }
 
     #[instrument(name = "topic_publish", skip_all)]

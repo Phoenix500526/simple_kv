@@ -96,10 +96,27 @@ impl CommandRequest {
         }
     }
 
+    pub fn new_psubscribe(pattern: impl Into<String>) -> Self {
+        Self {
+            request_data: Some(RequestData::Psubscribe(PSubscribe {
+                pattern: pattern.into(),
+            })),
+        }
+    }
+
     pub fn new_unsubscribe(topic: impl Into<String>, id: u32) -> Self {
         Self {
             request_data: Some(RequestData::Unsubscribe(Unsubscribe {
                 topic: topic.into(),
+                id,
+            })),
+        }
+    }
+
+    pub fn new_punsubscribe(pattern: impl Into<String>, id: u32) -> Self {
+        Self {
+            request_data: Some(RequestData::Punsubscribe(PUnsubscribe {
+                pattern: pattern.into(),
                 id,
             })),
         }

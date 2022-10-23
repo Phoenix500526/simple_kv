@@ -16,6 +16,8 @@ fn main() {
         "Hmexist",
         "Subscribe",
         "Unsubscribe",
+        "PSubscribe",
+        "PUnsubscribe",
     ] {
         config.type_attribute(item, "#[derive(Eq)]");
     }

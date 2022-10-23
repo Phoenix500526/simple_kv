@@ -30,10 +30,10 @@ pub trait Topic: Send + Sync + 'static {
     fn publish(self, name: String, value: Arc<CommandResponse>);
 
     /// 订阅某个模式
-    fn psubscribe(self, pattern: &'static str) -> mpsc::Receiver<Arc<CommandResponse>>;
+    fn psubscribe(self, pattern: String) -> mpsc::Receiver<Arc<CommandResponse>>;
 
     /// 退订某个模式
-    fn punsubscribe(self, pattern: &'static str, id: u32) -> Result<u32, KvError>;
+    fn punsubscribe(self, pattern: String, id: u32) -> Result<u32, KvError>;
 }
 
 /// 用于主题发布和订阅的数据结构
@@ -129,8 +129,8 @@ impl Topic for Arc<Broadcaster> {
     }
 
     #[instrument(name = "pattern_subscribe", skip_all)]
-    fn psubscribe(self, pattern: &'static str) -> mpsc::Receiver<Arc<CommandResponse>> {
-        let pattern = Pattern::new(pattern).unwrap();
+    fn psubscribe(self, pattern: String) -> mpsc::Receiver<Arc<CommandResponse>> {
+        let pattern = Pattern::new(&pattern[..]).unwrap();
         let id = {
             // topics 表中看看有没有 name 对应的 entry，有则获取，没有则创建
             let entry = self.patterns.entry(pattern).or_default();
@@ -170,8 +170,8 @@ impl Topic for Arc<Broadcaster> {
     }
 
     #[instrument(name = "pattern_unsubscribe", skip_all)]
-    fn punsubscribe(self, pattern: &'static str, id: u32) -> Result<u32, KvError> {
-        let pattern = Pattern::new(pattern).unwrap();
+    fn punsubscribe(self, pattern: String, id: u32) -> Result<u32, KvError> {
+        let pattern = Pattern::new(&pattern[..]).unwrap();
         let res = match self.remove_pattern(pattern, id) {
             Some(v) => Ok(v),
             None => Err(KvError::NotFound(format!("pattern {}", id))),
@@ -287,7 +287,7 @@ mod tests {
         let mut stream1 = b.clone().subscribe(topic_1);
         let mut stream2 = b.clone().subscribe(topic_2);
         let mut stream3 = b.clone().subscribe(topic_3);
-        let mut stream4 = b.clone().psubscribe("chat.*");
+        let mut stream4 = b.clone().psubscribe("chat.*".to_string());
         let id1: i64 = stream1.recv().await.unwrap().as_ref().try_into().unwrap();
         let id2: i64 = stream2.recv().await.unwrap().as_ref().try_into().unwrap();
         let id3: i64 = stream3.recv().await.unwrap().as_ref().try_into().unwrap();
@@ -318,7 +318,9 @@ mod tests {
         let result4 = stream4.recv().await.unwrap();
         assert_res_ok(&result4, &[v2.clone()], &[]);
 
-        b.clone().punsubscribe("chat.*", id4 as _).unwrap();
+        b.clone()
+            .punsubscribe("chat.*".to_string(), id4 as _)
+            .unwrap();
         b.clone()
             .publish("chat.exilir".to_string(), Arc::new(v2.clone().into()));
 

@@ -3,7 +3,7 @@
 pub struct CommandRequest {
     #[prost(
         oneof = "command_request::RequestData",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14"
     )]
     pub request_data: ::core::option::Option<command_request::RequestData>,
 }
@@ -35,6 +35,10 @@ pub mod command_request {
         Unsubscribe(super::Unsubscribe),
         #[prost(message, tag = "12")]
         Publish(super::Publish),
+        #[prost(message, tag = "13")]
+        Psubscribe(super::PSubscribe),
+        #[prost(message, tag = "14")]
+        Punsubscribe(super::PUnsubscribe),
     }
 }
 /// 服务端的命令响应
@@ -129,6 +133,20 @@ pub struct Subscribe {
 pub struct Unsubscribe {
     #[prost(string, tag = "1")]
     pub topic: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub id: u32,
+}
+/// 订阅某个模式
+#[derive(PartialOrd, Eq, Clone, PartialEq, ::prost::Message)]
+pub struct PSubscribe {
+    #[prost(string, tag = "1")]
+    pub pattern: ::prost::alloc::string::String,
+}
+/// 退订某个模式
+#[derive(PartialOrd, Eq, Clone, PartialEq, ::prost::Message)]
+pub struct PUnsubscribe {
+    #[prost(string, tag = "1")]
+    pub pattern: ::prost::alloc::string::String,
     #[prost(uint32, tag = "2")]
     pub id: u32,
 }

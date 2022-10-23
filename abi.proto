@@ -17,6 +17,8 @@ message CommandRequest {
         Subscribe subscribe = 10;
         Unsubscribe unsubscribe = 11;
         Publish publish = 12;
+        PSubscribe psubscribe = 13;
+        PUnsubscribe punsubscribe = 14;
     }
 }
 
@@ -89,6 +91,17 @@ message Subscribe {
 // 退订某个主题
 message Unsubscribe {
     string topic = 1;
+    uint32 id = 2;
+}
+
+// 订阅某个模式
+message PSubscribe {
+    string pattern = 1;
+}
+
+// 退订某个模式
+message PUnsubscribe {
+    string pattern = 1;
     uint32 id = 2;
 }
 

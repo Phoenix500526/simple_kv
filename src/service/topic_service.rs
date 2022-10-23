@@ -2,7 +2,7 @@ use futures::{stream, Stream};
 use std::{pin::Pin, sync::Arc};
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::{CommandResponse, Publish, Subscribe, Topic, Unsubscribe};
+use crate::{CommandResponse, PSubscribe, PUnsubscribe, Publish, Subscribe, Topic, Unsubscribe};
 
 /// 使用 tokio-stream 的 stream wrapper 来把一个 mpsc::Receiver 转换
 /// 成 Receiver Stream，这样就可以不断调用 next 来获得下一个值
@@ -20,11 +20,30 @@ impl TopicService for Subscribe {
     }
 }
 
+impl TopicService for PSubscribe {
+    fn execute(self, topic: impl Topic) -> StreamingResponse {
+        let rx = topic.psubscribe(self.pattern);
+        Box::pin(ReceiverStream::new(rx))
+    }
+}
+
 impl TopicService for Unsubscribe {
     /// CommandRequest Unsubscribe 没有返回值，所以 Service Unsubscribe 对
     /// 象只要接收到他就直接返回一个默认 OK 的 CommandResponse。可以用 stream::once 来包装
     fn execute(self, topic: impl Topic) -> StreamingResponse {
         let res = match topic.unsubscribe(self.topic, self.id) {
+            Ok(_) => CommandResponse::ok(),
+            Err(e) => e.into(),
+        };
+        Box::pin(stream::once(async { Arc::new(res) }))
+    }
+}
+
+impl TopicService for PUnsubscribe {
+    /// CommandRequest Unsubscribe 没有返回值，所以 Service Unsubscribe 对
+    /// 象只要接收到他就直接返回一个默认 OK 的 CommandResponse。可以用 stream::once 来包装
+    fn execute(self, topic: impl Topic) -> StreamingResponse {
+        let res = match topic.punsubscribe(self.pattern, self.id) {
             Ok(_) => CommandResponse::ok(),
             Err(e) => e.into(),
         };
@@ -94,6 +113,19 @@ mod tests {
         let id: i64 = res.next().await.unwrap().as_ref().try_into().unwrap();
 
         let cmd = CommandRequest::new_unsubscribe("lobby", id as u32);
+        let mut res = dispatch_stream(cmd, topic.clone());
+        let data = res.next().await.unwrap();
+        assert_res_ok(&data, &[], &[]);
+    }
+
+    #[tokio::test]
+    async fn dispatch_punsubscribe_should_work() {
+        let topic = Arc::new(Broadcaster::default());
+        let cmd = CommandRequest::new_psubscribe("lobby");
+        let mut res = dispatch_stream(cmd, topic.clone());
+        let id: i64 = res.next().await.unwrap().as_ref().try_into().unwrap();
+
+        let cmd = CommandRequest::new_punsubscribe("lobby", id as u32);
         let mut res = dispatch_stream(cmd, topic.clone());
         let data = res.next().await.unwrap();
         assert_res_ok(&data, &[], &[]);

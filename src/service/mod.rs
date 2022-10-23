@@ -171,7 +171,9 @@ pub fn dispatch_stream(cmd: CommandRequest, topic: impl Topic) -> StreamingRespo
     match cmd.request_data {
         Some(RequestData::Publish(param)) => param.execute(topic),
         Some(RequestData::Subscribe(param)) => param.execute(topic),
+        Some(RequestData::Psubscribe(param)) => param.execute(topic),
         Some(RequestData::Unsubscribe(param)) => param.execute(topic),
+        Some(RequestData::Punsubscribe(param)) => param.execute(topic),
         _ => unreachable!(),
     }
 }

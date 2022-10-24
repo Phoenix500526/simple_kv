@@ -1,10 +1,12 @@
+use futures::StreamExt;
 use shellfish::{Command, Shell};
+use simple_kv::YamuxCtrl;
 use simple_kv::{
     start_client_with_config, ClientConfig, CommandRequest, KvError::InvalidCommand, Kvpair,
-    ProstClientStream,
 };
 use std::error::Error;
-use tokio_util::compat::Compat;
+use tokio::net::TcpStream;
+use tokio_rustls::client::TlsStream;
 use tracing::info;
 
 #[macro_use]
@@ -14,29 +16,28 @@ extern crate shellfish;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     let config: ClientConfig = toml::from_str(include_str!("../fixtures/client.conf"))?;
-    let mut ctrl = start_client_with_config(&config).await?;
-    let stream = ctrl.open_stream().await?;
-    let mut shell = Shell::new_async(stream, "<simple_kv>-$ ");
+    let ctrl = start_client_with_config(&config).await?;
+    let mut shell = Shell::new_async(ctrl, "<simple_kv>-$ ");
 
     shell.commands.insert(
         "HGET",
         Command::new_async(
             "HGET <table> <key>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hget),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hget),
         ),
     );
     shell.commands.insert(
         "HMGET",
         Command::new_async(
             "HMGET <table> <key1> <key2> ... <keyN>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hmget),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hmget),
         ),
     );
     shell.commands.insert(
         "HGETALL",
         Command::new_async(
             "HGETALL <table>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hgetall),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hgetall),
         ),
     );
 
@@ -44,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HSET",
         Command::new_async(
             "HSET <table> <key> <value>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hset),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hset),
         ),
     );
 
@@ -52,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HMSET",
         Command::new_async(
             "HMSET <table> <key1> <value1> ... <keyN> <valueN>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hmset),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hmset),
         ),
     );
 
@@ -60,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HDEL",
         Command::new_async(
             "HDEL <table> <key>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hdel),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hdel),
         ),
     );
 
@@ -68,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HMDEL",
         Command::new_async(
             "HMDEL <table> <key1> <key2> ... <keyN>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hmdel),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hmdel),
         ),
     );
 
@@ -76,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HEXIST",
         Command::new_async(
             "HMHEXISTDEL <table> <key1>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hexist),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hexist),
         ),
     );
 
@@ -84,7 +85,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "HMEXIST",
         Command::new_async(
             "HMEXIST <table> <key1> <key2> ... <keyN>".to_string(),
-            async_fn!(ProstClientStream<Compat<yamux::Stream>>, hmexist),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, hmexist),
+        ),
+    );
+
+    shell.commands.insert(
+        "SUBSCRIBE",
+        Command::new_async(
+            "SUBSCRIBE <channel>".to_string(),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, subscribe),
+        ),
+    );
+
+    shell.commands.insert(
+        "PSUBSCRIBE",
+        Command::new_async(
+            "PSUBSCRIBE <pattern>".to_string(),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, psubscribe),
+        ),
+    );
+
+    shell.commands.insert(
+        "PUBLISH",
+        Command::new_async(
+            "PUBLISH <channel> <message>".to_string(),
+            async_fn!(YamuxCtrl<TlsStream<TcpStream>>, publish),
         ),
     );
 
@@ -94,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn hset(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args.get(1).ok_or_else(|| {
@@ -113,6 +138,7 @@ async fn hset(
         ))
     })?;
     let cmd = CommandRequest::new_hset(table, key, value.clone().into());
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!("(integer) 1");
@@ -123,7 +149,7 @@ async fn hset(
 }
 
 async fn hmset(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args.get(1).ok_or_else(|| {
@@ -152,6 +178,7 @@ async fn hmset(
         .collect();
 
     let cmd = CommandRequest::new_hmset(table, pairs);
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!("(integer) {}", data.values.len());
@@ -162,7 +189,7 @@ async fn hmset(
 }
 
 async fn hget(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args
@@ -172,6 +199,7 @@ async fn hget(
         .get(2)
         .ok_or_else(|| Box::new(InvalidCommand("Usage: HGET <table> <key>".to_string())))?;
     let cmd = CommandRequest::new_hget(table, key);
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         let value: String = data.values[0].clone().try_into().unwrap();
@@ -183,7 +211,7 @@ async fn hget(
 }
 
 async fn hmget(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args.get(1).ok_or_else(|| {
@@ -200,6 +228,7 @@ async fn hmget(
 
     println!("{}", table);
     let cmd = CommandRequest::new_hmget(table, keys.to_vec());
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!(
@@ -219,7 +248,7 @@ async fn hmget(
 }
 
 async fn hgetall(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args
@@ -227,6 +256,7 @@ async fn hgetall(
         .ok_or_else(|| Box::new(InvalidCommand("Usage: HGETALL <table>".to_string())))?;
 
     let cmd = CommandRequest::new_hgetall(table);
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!(
@@ -246,7 +276,7 @@ async fn hgetall(
 }
 
 async fn hdel(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args
@@ -258,6 +288,7 @@ async fn hdel(
         .ok_or_else(|| Box::new(InvalidCommand("Usage: HDEL <table> <key>".to_string())))?;
 
     let cmd = CommandRequest::new_hdel(table, key);
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!("(integer) 1");
@@ -268,7 +299,7 @@ async fn hdel(
 }
 
 async fn hmdel(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args
@@ -282,6 +313,7 @@ async fn hmdel(
     })?;
 
     let cmd = CommandRequest::new_hmdel(table, keys.to_vec());
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!("(integer) {}", data.values.len());
@@ -292,7 +324,7 @@ async fn hmdel(
 }
 
 async fn hexist(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args
@@ -302,6 +334,7 @@ async fn hexist(
         .get(2)
         .ok_or_else(|| Box::new(InvalidCommand("Usage: HEXIST <table> <key>".to_string())))?;
     let cmd = CommandRequest::new_hexist(table, key);
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
 
     if data.status == http::StatusCode::OK.as_u16() as u32 {
@@ -314,7 +347,7 @@ async fn hexist(
 }
 
 async fn hmexist(
-    stream: &mut ProstClientStream<Compat<yamux::Stream>>,
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
     args: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let table = args.get(1).ok_or_else(|| {
@@ -330,6 +363,7 @@ async fn hmexist(
     })?;
 
     let cmd = CommandRequest::new_hmexist(table, keys.to_vec());
+    let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();
     if data.status == http::StatusCode::OK.as_u16() as u32 {
         info!(
@@ -345,5 +379,67 @@ async fn hmexist(
     } else {
         info!("{:?}", data.message);
     }
+    Ok(())
+}
+
+async fn subscribe(
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
+    args: Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let channel = args
+        .get(1)
+        .ok_or_else(|| Box::new(InvalidCommand("Usage: SUBSCRIBE <channel> ".to_string())))?;
+
+    let cmd = CommandRequest::new_subscribe(channel);
+    let stream = ctrl.open_stream().await?;
+    let mut result = stream.execute_streaming(&cmd).await.unwrap();
+    let id = result.id;
+    info!("Subscribe topic: {}, id: {}", channel, id);
+    while let Some(Ok(data)) = result.next().await {
+        info!("Got published data: {:?}", data);
+    }
+
+    Ok(())
+}
+
+async fn publish(
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
+    args: Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let channel = args.get(1).ok_or_else(|| {
+        Box::new(InvalidCommand(
+            "Usage: PUBLISH <channel> <message>".to_string(),
+        ))
+    })?;
+
+    let message = args.get(2).ok_or_else(|| {
+        Box::new(InvalidCommand(
+            "Usage: PUBLISH <channel> <message>".to_string(),
+        ))
+    })?;
+
+    let cmd = CommandRequest::new_publish(channel, vec![message.clone().into()]);
+    let mut stream = ctrl.open_stream().await?;
+    let result = stream.execute(&cmd).await.unwrap();
+    info!("PUBLISH: {:?}", result);
+    Ok(())
+}
+
+async fn psubscribe(
+    ctrl: &mut YamuxCtrl<TlsStream<TcpStream>>,
+    args: Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let pattern = args
+        .get(1)
+        .ok_or_else(|| Box::new(InvalidCommand("Usage: PSUBSCRIBE <pattern> ".to_string())))?;
+
+    let cmd = CommandRequest::new_psubscribe(pattern);
+    let stream = ctrl.open_stream().await?;
+    let mut result = stream.execute_streaming(&cmd).await.unwrap();
+    info!("Subscribe pattern: {}, id: {}", pattern, result.id);
+    while let Some(Ok(data)) = result.next().await {
+        info!("Got published data: {:?}", data);
+    }
+
     Ok(())
 }

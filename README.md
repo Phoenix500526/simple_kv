@@ -1,4 +1,5 @@
 # simple_kv
+[![codecov](https://codecov.io/gh/Phoenix500526/simple_kv/branch/main/graph/badge.svg?token=UHC5AS6QV8)](https://codecov.io/gh/Phoenix500526/simple_kv)
 ## 功能性需求
 1. 根据不同的命令进行数据的存储、读取等。
 2. 客户端能够通过网络访问 KV Server，发送包含命令的请求，并得到相应的结果。

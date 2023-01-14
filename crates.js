@@ -1,0 +1,1 @@
+window.ALL_CRATES = ["kvc","kvc_cli","kvs","simple_kv"];

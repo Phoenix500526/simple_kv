@@ -226,7 +226,7 @@ async fn hmget(
         )))
     })?;
 
-    println!("{}", table);
+    println!("{table}");
     let cmd = CommandRequest::new_hmget(table, keys.to_vec());
     let mut stream = ctrl.open_stream().await?;
     let data = stream.execute(&cmd).await.unwrap();

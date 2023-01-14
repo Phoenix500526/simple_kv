@@ -40,7 +40,7 @@ impl CommandService for Hset {
                 Ok(None) => Value::default().into(),
                 Err(e) => e.into(),
             },
-            None => KvError::InvalidCommand(format!("{:?}", self)).into(),
+            None => KvError::InvalidCommand(format!("{self:?}")).into(),
         }
     }
 }

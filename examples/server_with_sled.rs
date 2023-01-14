@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
                 Ok(())
             }
             s => {
-                res.message = format!("altered: {}", s);
+                res.message = format!("altered: {s}");
                 Ok(())
             }
         })

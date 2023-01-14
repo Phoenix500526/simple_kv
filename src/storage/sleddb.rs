@@ -13,12 +13,12 @@ impl SledDb {
 
     // 使用 prefix 来模拟一个 table
     fn get_full_key(table: &str, key: &str) -> String {
-        format!("{}:{}", table, key)
+        format!("{table}:{key}")
     }
 
     // 遍历 table 的 key 时，直接将 prefix: 当作 table
     fn get_table_prefix(table: &str) -> String {
-        format!("{}:", table)
+        format!("{table}:")
     }
 }
 

@@ -134,7 +134,7 @@ impl CommandRequest {
 
 impl Value {
     pub fn format(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 }
 
@@ -146,7 +146,7 @@ impl CommandResponse {
         }
     }
     pub fn format(&self) -> String {
-        format!("{:?}", self)
+        format!("{self:?}")
     }
 }
 

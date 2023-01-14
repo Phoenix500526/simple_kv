@@ -163,7 +163,7 @@ impl Topic for Arc<Broadcaster> {
     fn unsubscribe(self, name: String, id: u32) -> Result<u32, KvError> {
         let res = match self.remove_subscription(name, id) {
             Some(v) => Ok(v),
-            None => Err(KvError::NotFound(format!("subscription {}", id))),
+            None => Err(KvError::NotFound(format!("subscription {id}"))),
         };
         self.purge_topic();
         res
@@ -174,7 +174,7 @@ impl Topic for Arc<Broadcaster> {
         let pattern = Pattern::new(&pattern[..]).unwrap();
         let res = match self.remove_pattern(pattern, id) {
             Some(v) => Ok(v),
-            None => Err(KvError::NotFound(format!("pattern {}", id))),
+            None => Err(KvError::NotFound(format!("pattern {id}"))),
         };
         self.purge_patterns();
         res

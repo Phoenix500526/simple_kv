@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     start_unsubscribe(ctrl.open_stream().await?, channel, id)?;
 
     while let Some(Ok(data)) = stream.next().await {
-        println!("Got published data: {:?}", data);
+        println!("Got published data: {data:?}");
     }
 
     println!("Done!");
@@ -52,7 +52,7 @@ fn start_publishing(
     tokio::spawn(async move {
         time::sleep(Duration::from_millis(1000)).await;
         let res = stream.execute(&cmd).await.unwrap();
-        println!("Finished publishing: {:?}", res);
+        println!("Finished publishing: {res:?}");
     });
 
     Ok(())
@@ -67,7 +67,7 @@ fn start_unsubscribe(
     tokio::spawn(async move {
         time::sleep(Duration::from_millis(2000)).await;
         let res = stream.execute(&cmd).await.unwrap();
-        println!("Finished unsubscribing: {:?}", res);
+        println!("Finished unsubscribing: {res:?}",);
     });
 
     Ok(())

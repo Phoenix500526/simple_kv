@@ -47,8 +47,8 @@ async fn gen_files(pem: &CertPem) -> Result<()> {
     };
     let cert_dir = "fixtures";
     fs::create_dir_all(cert_dir).await?;
-    fs::write(format!("{}/{}.cert", cert_dir, name), pem.cert.as_bytes()).await?;
-    fs::write(format!("{}/{}.key", cert_dir, name), pem.key.as_bytes()).await?;
+    fs::write(format!("{cert_dir}/{name}.cert"), pem.cert.as_bytes()).await?;
+    fs::write(format!("{cert_dir}/{name}.key"), pem.key.as_bytes()).await?;
     Ok(())
 }
 
